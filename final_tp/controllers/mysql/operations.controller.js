@@ -1,10 +1,11 @@
 const {
-    getAllOperationsService,
+    getAllOperationsServiceSQL,
     getOperationByIdService,
-    addNewOperationService,
+    getLastIdOperationService,
+    addNewOperationServiceSQL,
     deleteOperationService,
     updateOperationService
-} = require("../../services/mongo/operations.service.js");
+} = require("../../services/mysql/operations.service.js");
 
 const {
     uploadOperationsToMongoDB,
@@ -14,7 +15,7 @@ const {
 // get All Operations from mongoDB
 const getAllOperation = async (req, res) => {
     try{
-        const operations = await getAllOperationsService();
+        const operations = await getAllOperationsServiceSQL();
 
         return res.status(200).json(
             {   
@@ -89,7 +90,7 @@ const addNewOperation = async (req, res) => {
             typeoperation,
             montantoperation
         }
-        const id = await addNewOperationService(newOperation);
+        const id = await addNewOperationServiceSQL(newOperation);
         if(!id)
         {
             return res.status(500).json(
@@ -217,17 +218,18 @@ const updateOperation = async (req, res) => {
     }
 }
 
-// upload all operations from mongoDB to MySQL
-const uploadMongoDBToMySQL = async (req, res) => {
+// upload all operations from MySQL to mongoDB
+const uploadMySQLToMongoDB = async (req, res) => {
     try{
-        const operations = await getAllOperationsService();
-        const result = await downloadOperationsFromMongoDB();
+        const operations = await getAllOperationsServiceSQL();
+        const result = await uploadOperationsToMongoDB(operations);
         return res.status(200).json(
             {
                 status: 'success',
                 message: 'Operations uploaded successfully',
                 data: result
-            });
+            }
+        )
     }catch(err)
     {
         res.status(500).json(
@@ -240,25 +242,15 @@ const uploadMongoDBToMySQL = async (req, res) => {
     }
 }
 
-// download all operations from MySQL to mongoDB
-const downloadMySQLToMongoDB = async (req, res) => {
+// download all operations from mongoDB to MySQL
+const downloadMongoDBToMySQL = async (req, res) => {
     try{
-        const result = await uploadOperationsToMongoDB(await getAllOperationsService());
-        if(result)
-        {
-            return res.status(200).json(
-                {
-                    status: 'success',
-                    message: 'Operations downloaded successfully',
-                    data: result
-                }
-            )
-        }
-        return res.status(404).json(
+        const result = await downloadOperationsFromMongoDB();
+        return res.status(200).json(
             {
-                status: 'error',
-                message: 'No operations found',
-                data: null
+                status: 'success',
+                message: 'Operations downloaded successfully',
+                data: result
             }
         )
     }catch(err)
@@ -272,6 +264,10 @@ const downloadMySQLToMongoDB = async (req, res) => {
         )
     }
 }
+
+
+
+
 
 module.exports = {
     getAllOperation,
@@ -279,6 +275,6 @@ module.exports = {
     deleteOperation,
     updateOperation,
     getOperationById,
-    uploadMongoDBToMySQL,
-    downloadMySQLToMongoDB
+    uploadMySQLToMongoDB,
+    downloadMongoDBToMySQL
 };

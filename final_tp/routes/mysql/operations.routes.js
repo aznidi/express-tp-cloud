@@ -7,9 +7,9 @@ const {
     deleteOperation,
     updateOperation,
     getOperationById,
-    uploadMongoDBToMySQL,
-    downloadMySQLToMongoDB
-} = require("../../controllers/mongo/operations.controller.js");
+    uploadMySQLToMongoDB,
+    downloadMongoDBToMySQL
+} = require("../../controllers/mysql/operations.controller.js");
 
 
 router.get("/", getAllOperation);
@@ -17,7 +17,7 @@ router.get("/:idoperation", getOperationById);
 router.post("/", addNewOperation);
 router.delete("/:idoperation", deleteOperation);
 router.put("/:idoperation", updateOperation);
-router.get("/upload/mongodb-to-mysql", uploadMongoDBToMySQL);
-router.get("/download/mysql-to-mongodb", downloadMySQLToMongoDB);
+router.get("/upload/mysql-to-mongodb", uploadMySQLToMongoDB);
+router.get("/download/mongodb-to-mysql", downloadMongoDBToMySQL);
 
 module.exports = router;

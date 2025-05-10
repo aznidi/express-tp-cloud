@@ -38,19 +38,19 @@ const addNewOperationService = async (operation) => {
     try{
         const db = await connect();
         const lastId = await getLastIdOperationService();
-        operation.idoperation = lastId + 1;
+        operation.idoperation = parseInt(lastId) + 1;
 
         const result = await db.collection("operations").insertOne(operation);
 
         if(result.acknowledged)
         {
-            return result.insertedId;
+            return operation.idoperation;
         }
+        return null;
     }catch(err)
     {
         console.log('An error occurred while adding a new operation:', err);
-        throw err
-
+        throw err;
     }
 }
 
@@ -64,7 +64,7 @@ const getLastIdOperationService = async () => {
         {
             return 0;
         }
-        return lastOperation[0].idoperation;
+        return parseInt(lastOperation[0].idoperation);
     }catch(err)
     {
         console.log('An error occurred while getting last operation:', err);
@@ -76,7 +76,6 @@ const getLastIdOperationService = async () => {
 const deleteOperationService = async (id) => {
     try{ 
         const db = await connect();
-
 
         const result = await db.collection("operations").deleteOne({ idoperation: id });
         
@@ -114,7 +113,6 @@ const updateOperationService = async (id, operation) => {
         throw err;
     }
 }
-
 
 module.exports = {
     getAllOperationsService,

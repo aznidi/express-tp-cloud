@@ -1,6 +1,7 @@
 const express = require("express");
 require("dotenv").config();
 const operationsRoutesMongo = require("./routes/mongo/operations.routes.js");
+const operationsRoutesMysql = require("./routes/mysql/operations.routes.js");''
 
 
 
@@ -20,7 +21,10 @@ app.get("/", (req, res) => {
 
 
 // operations routes for mongo db
-app.use("/api/mongo/operations", operationsRoutesMongo);
+app.use("/api/mongo/operations", operationsRoutesMongo);''
+
+// operations routes for mysql db
+app.use("/api/mysql/operations", operationsRoutesMysql);
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
