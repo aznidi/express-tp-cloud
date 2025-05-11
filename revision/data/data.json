@@ -1,0 +1,57 @@
+[
+  {
+    "id": 1,
+    "nom": "Paris Saint-Germain",
+    "country": "France"
+  },
+  {
+    "id": 2,
+    "nom": "FC Barcelone",
+    "country": "Espagne"
+  },
+  {
+    "id": 3,
+    "nom": "Juventus Turin",
+    "country": "Italie"
+  },
+  {
+    "id": 4,
+    "nom": "Bayern Munich",
+    "country": "Allemagne"
+  },
+  {
+    "id": 5,
+    "nom": "Benfica Lisbonne",
+    "country": "Portugal"
+  },
+  {
+    "id": 6,
+    "nom": "RSC Anderlecht",
+    "country": "Belgique"
+  },
+  {
+    "id": 7,
+    "nom": "Ajax Amsterdam",
+    "country": "Pays-Bas"
+  },
+  {
+    "id": 8,
+    "nom": "Manchester United",
+    "country": "Angleterre"
+  },
+  {
+    "id": 9,
+    "nom": "FC Bâle",
+    "country": "Suisse"
+  },
+  {
+    "id": 10,
+    "nom": "Red Bull Salzbourg",
+    "country": "Autriche"
+  },
+  {
+    "id": 1745418978195,
+    "nom": "Wydad AC",
+    "country": "Maroc"
+  }
+]
