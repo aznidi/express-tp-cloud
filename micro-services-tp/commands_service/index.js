@@ -51,7 +51,36 @@ const getProductsPriceTotal = async (products_ids = []) => {
 
 app.post('/create/commande', async (req, res) => {
     try{
-        const {email, products_ids} = req.body;
+        const { products_ids } = req.body;
+        const full_token = req.header('Authorization');
+        if(!full_token){
+            return res.status(401).json({
+                status: false,
+                message: 'Unauthorized',
+                data: null
+            });
+        }
+        const token = full_token.split(' ')[1];
+        const verified = await verifyToken(token);
+
+        if(!verified?.verified){
+            return res.status(401).json({
+                status: false,
+                message: 'Unauthorized',
+                data: null
+            });
+        }
+
+        const email = verified?.email || null;
+        const userId = verified?.userId || null;
+
+        if(!userId || !email){
+            return res.status(401).json({
+                status: false,
+                message: 'Unauthorized',
+                data: verified
+            });
+        }
         
        
         if(!Array.isArray(products_ids) || products_ids.length === 0){
@@ -129,6 +158,20 @@ app.get('/get-commandes-list', async (req, res) => {
         });
     }
 })
+
+
+const verifyToken = async (token) => {
+    try{
+        const response = await axios.get('http://localhost:8003/auth/verify-token', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        return response.data?.data || {};
+    }catch(error){
+        throw new Error('Invalid token');
+    }
+}
 
 app.get('/', (req, res) => {
     res.status(200).json({
