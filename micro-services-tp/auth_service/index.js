@@ -4,6 +4,10 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
+const amqp = require("amqplib");
+
+const RABBITMQ_URL = 'amqp://localhost';
+const QUEUE_NAME = 'test_queue';
 
 dotenv.config();
 const PORT = process.env.PORT || 8003;
@@ -27,6 +31,9 @@ async function connectToMongoDB()
 
 connectToMongoDB();
 
+
+
+
 app.get("/", (req, res) => {
     res.status(200).json({
        success: true,
@@ -34,6 +41,47 @@ app.get("/", (req, res) => {
        data: null
     });
 });
+
+
+async function sendMessage(message)
+{
+    try{
+        const conn = await amqp.connect(RABBITMQ_URL);
+
+        const channel = await conn.createChannel();
+
+
+        await channel.assertQueue(QUEUE_NAME, { durable: false });
+        channel.sendToQueue(QUEUE_NAME, Buffer.from(JSON.stringify(message)));
+
+        console.log(`Message sent to RabbitMQ: ${message}`);
+
+        await channel.close();
+        await conn.close();
+    }catch(error){
+        console.error('Error sending message to RabbitMQ:', error);
+        process.exit(1);
+    }
+}
+
+app.get("/auth/:message", async (req, res) => {
+    try{
+        const message = req.params.message;
+        await sendMessage(message);
+
+        res.status(200).json({
+            success: true,
+            message: "Message sent successfully",
+            data: message
+        });
+    }catch(error){
+        res.status(500).json({
+            success: false,
+            message: "Error sending message",
+            data: error.message
+        });
+    }
+})
 
 
 app.post("/auth/register", async (req, res) => {

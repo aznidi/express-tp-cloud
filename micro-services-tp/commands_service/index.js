@@ -4,6 +4,12 @@ const Commande = require('./models/commande');
 const axios = require('axios');
 const app = express();
 
+const amqp = require("amqplib");
+
+const RABBITMQ_URL = 'amqp://localhost';
+const QUEUE_NAME = 'test_queue';
+
+
 const PORT = process.env.PORT || 8001;
 mongoose.set('strictQuery', false);
 async function connectToMongoDB()
@@ -19,6 +25,25 @@ async function connectToMongoDB()
 }
 
 connectToMongoDB();
+
+
+async function startConsumer() {
+    const conn = await amqp.connect(RABBITMQ_URL);
+    const channel = await conn.createChannel();
+  
+    await channel.assertQueue(QUEUE_NAME, { durable: false });
+  
+    console.log('Waiting for messages...');
+    channel.consume(QUEUE_NAME, msg => {
+      if (msg !== null) {
+        console.log('Message received:', msg.content.toString());
+        channel.ack(msg);
+      }
+    });
+}
+  
+startConsumer().catch(console.error);
+
 
 app.use(express.json());
 
