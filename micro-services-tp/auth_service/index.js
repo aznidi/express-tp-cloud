@@ -64,24 +64,24 @@ async function sendMessage(message)
     }
 }
 
-app.get("/auth/:message", async (req, res) => {
-    try{
-        const message = req.params.message;
-        await sendMessage(message);
+// app.get("/auth/:message", async (req, res) => {
+//     try{
+//         const message = req.params.message;
+//         await sendMessage(message);
 
-        res.status(200).json({
-            success: true,
-            message: "Message sent successfully",
-            data: message
-        });
-    }catch(error){
-        res.status(500).json({
-            success: false,
-            message: "Error sending message",
-            data: error.message
-        });
-    }
-})
+//         res.status(200).json({
+//             success: true,
+//             message: "Message sent successfully",
+//             data: message
+//         });
+//     }catch(error){
+//         res.status(500).json({
+//             success: false,
+//             message: "Error sending message",
+//             data: error.message
+//         });
+//     }
+// })
 
 
 app.post("/auth/register", async (req, res) => {
@@ -186,7 +186,7 @@ const verifyToken = (req, res, next) => {
             success: false, message: "Unauthorized" });
     }
 
-    const verified = jwt.verify(token.split(' ')[1], JWT_SECRET);
+    const verified = jwt.verify(token.split(' ')[1], JWT_SECRET); // token = Authorization: Bearer <token>
 
     if(!verified){
         return res.status(401).json({
@@ -201,7 +201,7 @@ app.get("/auth/protected", verifyToken, (req, res) => {
     res.status(200).json({
         success: true,
         message: "Protected route accessed successfully",
-        data: req.user
+        data: req.user ? req.user : null
     });
 });
 
