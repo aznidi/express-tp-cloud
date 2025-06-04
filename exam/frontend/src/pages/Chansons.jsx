@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
@@ -30,6 +30,23 @@ const chansonSchema = Yup.object({
   genre: Yup.string().required('Le genre est requis'),
 });
 
+// Debounce hook
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
 export const Chansons = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingChanson, setEditingChanson] = useState(null);
@@ -37,9 +54,26 @@ export const Chansons = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const queryClient = useQueryClient();
 
-  // Fetch all songs
+  // Debounce search term
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
+  // Fetch all songs or filtered/searched songs
   const { data: chansons = [], isLoading, error } = useQuery({
-    queryKey: ['chansons'],
+    queryKey: ['chansons', debouncedSearchTerm, filterGenre],
+    queryFn: async () => {
+      if (debouncedSearchTerm) {
+        return await chansonService.searchChansons(debouncedSearchTerm);
+      } else if (filterGenre) {
+        return await chansonService.filterChansonsByGenre(filterGenre);
+      } else {
+        return await chansonService.getAllChansons();
+      }
+    },
+  });
+
+  // Fetch all songs for genres list (always get all for genre options)
+  const { data: allChansons = [] } = useQuery({
+    queryKey: ['all-chansons'],
     queryFn: () => chansonService.getAllChansons(),
   });
 
@@ -53,6 +87,7 @@ export const Chansons = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['chansons']);
+      queryClient.invalidateQueries(['all-chansons']);
       toast.success(editingChanson ? 'Chanson modifiée avec succès !' : 'Chanson ajoutée avec succès !');
       setIsModalOpen(false);
       setEditingChanson(null);
@@ -68,6 +103,7 @@ export const Chansons = () => {
     mutationFn: (id) => chansonService.deleteChanson(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['chansons']);
+      queryClient.invalidateQueries(['all-chansons']);
       toast.success('Chanson supprimée avec succès !');
     },
     onError: (error) => {
@@ -91,19 +127,8 @@ export const Chansons = () => {
     },
   });
 
-  // Filter and search logic
-  const filteredChansons = chansons.filter((chanson) => {
-    const matchesSearch = searchTerm === '' || 
-      chanson.titre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      chanson.artiste.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesGenre = filterGenre === '' || 
-      chanson.genre.toLowerCase().includes(filterGenre.toLowerCase());
-    
-    return matchesSearch && matchesGenre;
-  });
-
-  const genres = [...new Set(chansons.map(c => c.genre))];
+  // Get unique genres from all songs
+  const genres = [...new Set(allChansons.map(c => c.genre))];
 
   const handleEdit = (chanson) => {
     setEditingChanson(chanson);
@@ -132,6 +157,11 @@ export const Chansons = () => {
     setIsModalOpen(false);
     setEditingChanson(null);
     formik.resetForm();
+  };
+
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setFilterGenre('');
   };
 
   if (isLoading) {
@@ -164,7 +194,7 @@ export const Chansons = () => {
             <span>Mes Chansons</span>
           </h1>
           <p className="text-sm text-textSecondary font-segoe mt-1">
-            Gérez votre collection musicale ({filteredChansons.length} chanson{filteredChansons.length > 1 ? 's' : ''})
+            Gérez votre collection musicale ({chansons.length} chanson{chansons.length > 1 ? 's' : ''})
           </p>
         </div>
         <Button onClick={() => setIsModalOpen(true)} className="flex items-center space-x-2">
@@ -173,8 +203,47 @@ export const Chansons = () => {
         </Button>
       </div>
 
+      {/* Search and Filter Controls */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        <div className="relative">
+          <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-textSecondary w-4 h-4" />
+          <Input
+            placeholder="Rechercher par titre ou artiste..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        
+        <div className="relative">
+          <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-textSecondary w-4 h-4" />
+          <select
+            value={filterGenre}
+            onChange={(e) => setFilterGenre(e.target.value)}
+            className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-textPrimary font-segoe"
+          >
+            <option value="">Tous les genres</option>
+            {genres.map((genre) => (
+              <option key={genre} value={genre}>{genre}</option>
+            ))}
+          </select>
+        </div>
+
+        {(searchTerm || filterGenre) && (
+          <div className="flex items-center">
+            <Button
+              variant="outline"
+              onClick={handleResetFilters}
+              className="flex items-center space-x-2"
+            >
+              <span>Réinitialiser</span>
+            </Button>
+          </div>
+        )}
+      </div>
+
       {/* Songs Grid */}
-      {filteredChansons.length === 0 ? (
+      {chansons.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">
             <Music className="w-16 h-16 text-textSecondary mx-auto mb-4" />
@@ -196,7 +265,7 @@ export const Chansons = () => {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredChansons.map((chanson) => (
+          {chansons.map((chanson) => (
             <Card key={chanson._id} className="fade-in group">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">

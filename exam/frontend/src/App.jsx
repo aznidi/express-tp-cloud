@@ -7,6 +7,7 @@ import { Register } from './pages/Register';
 import { Chansons } from './pages/Chansons';
 import { Playlists } from './pages/Playlists';
 import { Search } from './pages/Search';
+import { Profile } from './pages/Profile';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { authService } from './services/api';
 
@@ -62,6 +63,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Search />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <Profile />
               </ProtectedRoute>
             } 
           />

@@ -86,6 +86,15 @@ export const authService = {
     }
   },
 
+  getAllUsers: async () => {
+    try {
+      const response = await authAPI.get('/users');
+      return response.data;
+    } catch (error) {
+      handleApiError(error);
+    }
+  },
+
   updateUser: async (email, nom, password) => {
     try {
       const response = await authAPI.put(`/user/${email}`, { nom, password });
@@ -159,7 +168,7 @@ export const chansonService = {
 
   deleteChanson: async (id) => {
     try {
-      const response = await chansonAPI.delete(`/${id}`);
+      const response = await chansonAPI.delete(`/chanson/${id}`);
       return response.data;
     } catch (error) {
       handleApiError(error);
@@ -177,7 +186,7 @@ export const chansonService = {
 
   filterChansonsByGenre: async (genre) => {
     try {
-      const response = await chansonAPI.get(`/chansons/filter?genre=${encodeURIComponent(genre)}`);
+      const response = await chansonAPI.get(`/chansons/filtrer?genre=${encodeURIComponent(genre)}`);
       return response.data;
     } catch (error) {
       handleApiError(error);

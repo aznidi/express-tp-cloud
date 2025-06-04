@@ -1,11 +1,13 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const axios = require('axios');
 const Playlist = require('./models/playlist');
 
 const app = express();
 const PORT = 8002;
 const MONGODB_URI = 'mongodb://localhost:27017/music_app_playlists';
+const AUTH_SERVICE_URL = 'http://localhost:8000';
 
 app.use(cors({
   origin: '*',
@@ -27,9 +29,24 @@ app.post('/playlist', async (req, res) => {
   try {
     const { nom, idUtilisateur } = req.body;
     
+    // Si idUtilisateur est un email, convertir en ID
+    let finalUserId = idUtilisateur;
+    if (idUtilisateur.includes('@')) {
+      try {
+        const userResponse = await axios.get(`${AUTH_SERVICE_URL}/user/${idUtilisateur}`);
+        const user = userResponse.data;
+        finalUserId = user._id;
+      } catch (authError) {
+        if (authError.response && authError.response.status === 404) {
+          return res.status(404).json({ message: 'Utilisateur non trouvé' });
+        }
+        throw authError;
+      }
+    }
+    
     const newPlaylist = new Playlist({ 
       nom, 
-      idUtilisateur,
+      idUtilisateur: finalUserId,
       listeChansons: []
     });
     await newPlaylist.save();
@@ -45,17 +62,28 @@ app.post('/playlist', async (req, res) => {
 
 app.get('/playlist/:email', async (req, res) => {
   try {
-    const playlists = await Playlist.find();
+    const userEmail = req.params.email;
     
-    if (playlists.length === 0) {
-      return res.status(404).json({ message: 'Aucune playlist trouvée' });
+    // Étape 1: Trouver l'utilisateur par email via le service d'authentification
+    try {
+      const userResponse = await axios.get(`${AUTH_SERVICE_URL}/user/${userEmail}`);
+      const user = userResponse.data;
+      
+      // Étape 2: Trouver les playlists avec l'ID de l'utilisateur
+      const playlists = await Playlist.find({ idUtilisateur: user._id });
+      
+      res.status(200).json(playlists);
+    } catch (authError) {
+      if (authError.response && authError.response.status === 404) {
+        return res.status(404).json({ message: 'Utilisateur non trouvé' });
+      }
+      throw authError;
     }
-    
-    res.status(200).json(playlists);
   } catch (error) {
     res.status(500).json({ message: 'Erreur serveur', error: error.message });
   }
 });
+
 app.put('/playlist/ajouter-chanson/:playlistId', async (req, res) => {
   try {
     const { chansonId } = req.body;

@@ -23,6 +23,60 @@ mongoose.connect(MONGODB_URI, {
 
 // Routes
 
+// GET /chansons - Lister toutes les chansons disponibles
+app.get('/chansons', async (req, res) => {
+  try {
+    const chansons = await Chanson.find();
+    res.status(200).json(chansons);
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+  }
+});
+
+// GET /chansons/filtrer?genre=... - Filtrer les chansons par genre musical
+app.get('/chansons/filtrer', async (req, res) => {
+  try {
+    const { genre } = req.query;
+    if (!genre) {
+      return res.status(400).json({ message: 'Paramètre genre requis' });
+    }
+    
+    const chansons = await Chanson.find({ 
+      genre: { $regex: genre, $options: 'i' } 
+    });
+    
+    if (chansons.length === 0) {
+      return res.status(404).json({ message: 'Aucune chanson trouvée pour ce genre' });
+    }
+    
+    res.status(200).json(chansons);
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+  }
+});
+
+// GET /chanson/recherche?motcle=... - Rechercher une chanson par titre ou artiste
+app.get('/chanson/recherche', async (req, res) => {
+  try {
+    const { motcle } = req.query;
+    if (!motcle) {
+      return res.status(400).json({ message: 'Paramètre motcle requis' });
+    }
+    
+    const chansons = await Chanson.find({
+      $or: [
+        { titre: { $regex: motcle, $options: 'i' } },
+        { artiste: { $regex: motcle, $options: 'i' } }
+      ]
+    });
+    
+    res.status(200).json(chansons);
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+  }
+});
+
+// GET /chanson/:id - Récupérer une chanson par ID
 app.get('/chanson/:id', async (req, res) => {
   try {
     const chanson = await Chanson.findById(req.params.id);
@@ -34,14 +88,23 @@ app.get('/chanson/:id', async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur', error: error.message });
   }
 });
+
+// POST /chanson - Créer une nouvelle chanson
 app.post('/chanson', async (req, res) => {
   try {
     const { titre, artiste, duree, genre } = req.body;
     
+    // Validation basique
+    if (!titre || !artiste || !duree || !genre) {
+      return res.status(400).json({ 
+        message: 'Tous les champs sont requis (titre, artiste, duree, genre)' 
+      });
+    }
+    
     const newChanson = new Chanson({ titre, artiste, duree, genre });
     await newChanson.save();
     
-    res.status(200).json({ 
+    res.status(201).json({ 
       message: 'Chanson ajoutée avec succès',
       chanson: newChanson
     });
@@ -49,6 +112,8 @@ app.post('/chanson', async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur', error: error.message });
   }
 });
+
+// PUT /chanson/:id - Modifier une chanson
 app.put('/chanson/:id', async (req, res) => {
   try {
     const { titre, artiste, duree, genre } = req.body;
@@ -71,7 +136,8 @@ app.put('/chanson/:id', async (req, res) => {
   }
 });
 
-app.delete('/:id', async (req, res) => {
+// DELETE /chanson/:id - Supprimer une chanson
+app.delete('/chanson/:id', async (req, res) => {
   try {
     const chanson = await Chanson.findByIdAndDelete(req.params.id);
     if (!chanson) {
@@ -84,57 +150,14 @@ app.delete('/:id', async (req, res) => {
   }
 });
 
-app.get('/chanson/recherche', async (req, res) => {
-  try {
-    const { motcle } = req.query;
-    if (!motcle) {
-      return res.status(400).json({ message: 'Paramètre motcle requis' });
-    }
-    
-    const chansons = await Chanson.find({
-      $or: [
-        { titre: { $regex: motcle, $options: 'i' } },
-        { artiste: { $regex: motcle, $options: 'i' } }
-      ]
-    });
-    
-    res.status(200).json(chansons);
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur serveur', error: error.message });
-  }
-});
-
-// GET /chansons - Lister toutes les chansons disponibles
-app.get('/chansons', async (req, res) => {
-  try {
-    const chansons = await Chanson.find();
-    res.status(200).json(chansons);
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur serveur', error: error.message });
-  }
-});
-
-app.get('/chansons/filter', async (req, res) => {
-  try {
-    const { genre } = req.query;
-    if (!genre) {
-      return res.status(400).json({ message: 'Paramètre genre requis' });
-    }
-    
-    const chansons = await Chanson.find({ 
-      genre: { $regex: genre, $options: 'i' } 
-    });
-    
-    if (chansons.length === 0) {
-      return res.status(404).json({ message: 'Aucune chanson trouvée pour ce genre' });
-    }
-    
-    res.status(200).json(chansons);
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur serveur', error: error.message });
-  }
-});
-
 app.listen(PORT, () => {
   console.log(`Chanson Service running on port ${PORT}`);
+  console.log('Available endpoints:');
+  console.log('  GET    /chansons                    - Lister toutes les chansons');
+  console.log('  GET    /chansons/filtrer?genre=...   - Filtrer par genre');
+  console.log('  GET    /chanson/recherche?motcle=... - Rechercher par titre/artiste');
+  console.log('  GET    /chanson/:id                 - Récupérer une chanson');
+  console.log('  POST   /chanson                     - Créer une chanson');
+  console.log('  PUT    /chanson/:id                 - Modifier une chanson');
+  console.log('  DELETE /chanson/:id                 - Supprimer une chanson');
 });

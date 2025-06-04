@@ -11,7 +11,9 @@ import {
   Clock,
   User,
   PlayCircle,
-  Minus
+  Minus,
+  Check,
+  X
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -30,6 +32,7 @@ export const Playlists = () => {
   const [isAddSongModalOpen, setIsAddSongModalOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
+  const [loadingActions, setLoadingActions] = useState({});
   const queryClient = useQueryClient();
   const currentUser = authService.getCurrentUser();
 
@@ -52,7 +55,7 @@ export const Playlists = () => {
       if (editingPlaylist) {
         return playlistService.renamePlaylist(editingPlaylist._id, data.nom);
       }
-      return playlistService.createPlaylist(data.nom, currentUser?.id);
+      return playlistService.createPlaylist(data.nom, currentUser?.email);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['playlists']);
@@ -82,12 +85,43 @@ export const Playlists = () => {
   const addSongMutation = useMutation({
     mutationFn: ({ playlistId, chansonId }) => 
       playlistService.addSongToPlaylist(playlistId, chansonId),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['playlists']);
-      toast.success('Chanson ajoutée à la playlist !');
+    onMutate: async ({ playlistId, chansonId }) => {
+      // Optimistic update
+      setLoadingActions(prev => ({ ...prev, [`add-${chansonId}`]: true }));
+      
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries(['playlists']);
+      
+      // Snapshot previous value
+      const previousPlaylists = queryClient.getQueryData(['playlists', currentUser?.email]);
+      
+      // Optimistically update
+      queryClient.setQueryData(['playlists', currentUser?.email], (old) => {
+        return old?.map(playlist => 
+          playlist._id === playlistId 
+            ? { ...playlist, listeChansons: [...playlist.listeChansons, chansonId] }
+            : playlist
+        );
+      });
+      
+      return { previousPlaylists };
     },
-    onError: (error) => {
+    onSuccess: () => {
+      toast.success('Chanson ajoutée à la playlist !');
+      setIsAddSongModalOpen(false);
+    },
+    onError: (error, variables, context) => {
+      // Rollback optimistic update
+      queryClient.setQueryData(['playlists', currentUser?.email], context.previousPlaylists);
       toast.error(error.message);
+    },
+    onSettled: (data, error, { chansonId }) => {
+      queryClient.invalidateQueries(['playlists']);
+      setLoadingActions(prev => {
+        const newState = { ...prev };
+        delete newState[`add-${chansonId}`];
+        return newState;
+      });
     },
   });
 
@@ -95,12 +129,43 @@ export const Playlists = () => {
   const removeSongMutation = useMutation({
     mutationFn: ({ playlistId, chansonId }) => 
       playlistService.removeSongFromPlaylist(playlistId, chansonId),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['playlists']);
-      toast.success('Chanson retirée de la playlist !');
+    onMutate: async ({ playlistId, chansonId }) => {
+      // Optimistic update
+      setLoadingActions(prev => ({ ...prev, [`remove-${chansonId}`]: true }));
+      
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries(['playlists']);
+      
+      // Snapshot previous value
+      const previousPlaylists = queryClient.getQueryData(['playlists', currentUser?.email]);
+      
+      // Optimistically update
+      queryClient.setQueryData(['playlists', currentUser?.email], (old) => {
+        return old?.map(playlist => 
+          playlist._id === playlistId 
+            ? { ...playlist, listeChansons: playlist.listeChansons.filter(id => id !== chansonId) }
+            : playlist
+        );
+      });
+      
+      return { previousPlaylists };
     },
-    onError: (error) => {
+    onSuccess: () => {
+      toast.success('Chanson retirée de la playlist !');
+      setIsAddSongModalOpen(false);
+    },
+    onError: (error, variables, context) => {
+      // Rollback optimistic update
+      queryClient.setQueryData(['playlists', currentUser?.email], context.previousPlaylists);
       toast.error(error.message);
+    },
+    onSettled: (data, error, { chansonId }) => {
+      queryClient.invalidateQueries(['playlists']);
+      setLoadingActions(prev => {
+        const newState = { ...prev };
+        delete newState[`remove-${chansonId}`];
+        return newState;
+      });
     },
   });
 
@@ -220,18 +285,18 @@ export const Playlists = () => {
             const totalDuration = playlistSongs.reduce((acc, song) => acc + song.duree, 0);
             
             return (
-              <Card key={playlist._id} className="fade-in group">
+              <Card key={playlist._id} className="fade-in group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/20">
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
-                    <div className="w-12 h-12 bg-secondary/10 rounded-lg flex items-center justify-center">
-                      <List className="w-6 h-6 text-secondary" />
+                    <div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-lg flex items-center justify-center">
+                      <List className="w-6 h-6 text-primary" />
                     </div>
                     <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleEdit(playlist)}
-                        className="h-8 w-8"
+                        className="h-8 w-8 hover:bg-primary/10"
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -239,24 +304,24 @@ export const Playlists = () => {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDelete(playlist._id)}
-                        className="h-8 w-8 text-red-500 hover:text-red-700"
+                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
 
-                  <h3 className="font-semibold text-textPrimary font-poppins mb-2 truncate">
+                  <h3 className="font-semibold text-textPrimary font-poppins mb-2 truncate text-lg">
                     {playlist.nom}
                   </h3>
                   
                   <div className="space-y-2 text-sm text-textSecondary font-segoe mb-4">
                     <div className="flex items-center space-x-2">
-                      <Music className="w-4 h-4" />
+                      <Music className="w-4 h-4 text-primary" />
                       <span>{playlistSongs.length} chanson{playlistSongs.length > 1 ? 's' : ''}</span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Clock className="w-4 h-4" />
+                      <Clock className="w-4 h-4 text-secondary" />
                       <span>{formatDuration(totalDuration)}</span>
                     </div>
                   </div>
@@ -265,26 +330,27 @@ export const Playlists = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full"
+                      className="w-full hover:bg-primary/5 border-primary/20"
                       onClick={() => {
                         setSelectedPlaylist(playlist);
                         setIsAddSongModalOpen(true);
                       }}
                     >
-                      <Plus className="w-4 h-4 mr-2" />
+                      <Music className="w-4 h-4 mr-2" />
                       Gérer les chansons
                     </Button>
                     
                     {playlistSongs.length > 0 && (
-                      <div className="mt-3 space-y-1">
-                        <p className="text-xs text-textSecondary font-segoe">Aperçu :</p>
+                      <div className="mt-3 space-y-1 p-3 bg-gray-50 rounded-md">
+                        <p className="text-xs text-textSecondary font-segoe font-medium">Aperçu :</p>
                         {playlistSongs.slice(0, 3).map((song) => (
-                          <div key={song._id} className="text-xs text-textSecondary font-segoe truncate">
-                            • {song.titre} - {song.artiste}
+                          <div key={song._id} className="text-xs text-textSecondary font-segoe truncate flex items-center space-x-1">
+                            <div className="w-1 h-1 bg-primary rounded-full"></div>
+                            <span>{song.titre} - {song.artiste}</span>
                           </div>
                         ))}
                         {playlistSongs.length > 3 && (
-                          <div className="text-xs text-textSecondary font-segoe">
+                          <div className="text-xs text-textSecondary font-segoe italic">
                             ... et {playlistSongs.length - 3} autre{playlistSongs.length - 3 > 1 ? 's' : ''}
                           </div>
                         )}
@@ -347,23 +413,31 @@ export const Playlists = () => {
           <div className="space-y-6">
             {/* Current Songs */}
             <div>
-              <h3 className="font-medium text-textPrimary font-poppins mb-3">
-                Chansons dans la playlist ({getPlaylistSongs(selectedPlaylist).length})
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-medium text-textPrimary font-poppins">
+                  Chansons dans la playlist
+                </h3>
+                <span className="text-sm text-textSecondary bg-primary/10 px-2 py-1 rounded-full">
+                  {getPlaylistSongs(selectedPlaylist).length}
+                </span>
+              </div>
               {getPlaylistSongs(selectedPlaylist).length === 0 ? (
-                <p className="text-textSecondary font-segoe text-sm">
-                  Aucune chanson dans cette playlist
-                </p>
+                <div className="text-center p-8 border border-dashed border-gray-200 rounded-lg">
+                  <Music className="w-12 h-12 text-textSecondary mx-auto mb-2" />
+                  <p className="text-textSecondary font-segoe text-sm">
+                    Aucune chanson dans cette playlist
+                  </p>
+                </div>
               ) : (
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-100 rounded-lg">
                   {getPlaylistSongs(selectedPlaylist).map((song) => (
-                    <div key={song._id} className="flex items-center justify-between p-3 border border-border rounded-md">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-primary/10 rounded-md flex items-center justify-center">
-                          <Music className="w-4 h-4 text-primary" />
+                    <div key={song._id} className="flex items-center justify-between p-3 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center space-x-3 flex-1">
+                        <div className="w-10 h-10 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-md flex items-center justify-center flex-shrink-0">
+                          <Music className="w-5 h-5 text-primary" />
                         </div>
-                        <div>
-                          <p className="font-medium text-textPrimary font-poppins text-sm">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-textPrimary font-poppins text-sm truncate">
                             {song.titre}
                           </p>
                           <p className="text-xs text-textSecondary font-segoe">
@@ -375,9 +449,14 @@ export const Playlists = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleRemoveSong(song._id)}
-                        className="text-red-500 hover:text-red-700"
+                        disabled={loadingActions[`remove-${song._id}`]}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 ml-2"
                       >
-                        <Minus className="w-4 h-4" />
+                        {loadingActions[`remove-${song._id}`] ? (
+                          <LoadingSpinner size="sm" />
+                        ) : (
+                          <Minus className="w-4 h-4" />
+                        )}
                       </Button>
                     </div>
                   ))}
@@ -387,23 +466,31 @@ export const Playlists = () => {
 
             {/* Available Songs */}
             <div>
-              <h3 className="font-medium text-textPrimary font-poppins mb-3">
-                Chansons disponibles ({getAvailableSongs(selectedPlaylist).length})
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-medium text-textPrimary font-poppins">
+                  Chansons disponibles
+                </h3>
+                <span className="text-sm text-textSecondary bg-secondary/10 px-2 py-1 rounded-full">
+                  {getAvailableSongs(selectedPlaylist).length}
+                </span>
+              </div>
               {getAvailableSongs(selectedPlaylist).length === 0 ? (
-                <p className="text-textSecondary font-segoe text-sm">
-                  Toutes vos chansons sont déjà dans cette playlist
-                </p>
+                <div className="text-center p-8 border border-dashed border-gray-200 rounded-lg">
+                  <Check className="w-12 h-12 text-green-500 mx-auto mb-2" />
+                  <p className="text-textSecondary font-segoe text-sm">
+                    Toutes vos chansons sont déjà dans cette playlist
+                  </p>
+                </div>
               ) : (
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-100 rounded-lg">
                   {getAvailableSongs(selectedPlaylist).map((song) => (
-                    <div key={song._id} className="flex items-center justify-between p-3 border border-border rounded-md">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-primary/10 rounded-md flex items-center justify-center">
-                          <Music className="w-4 h-4 text-primary" />
+                    <div key={song._id} className="flex items-center justify-between p-3 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center space-x-3 flex-1">
+                        <div className="w-10 h-10 bg-gradient-to-br from-secondary/10 to-primary/10 rounded-md flex items-center justify-center flex-shrink-0">
+                          <Music className="w-5 h-5 text-secondary" />
                         </div>
-                        <div>
-                          <p className="font-medium text-textPrimary font-poppins text-sm">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-textPrimary font-poppins text-sm truncate">
                             {song.titre}
                           </p>
                           <p className="text-xs text-textSecondary font-segoe">
@@ -415,9 +502,14 @@ export const Playlists = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleAddSong(song._id)}
-                        className="text-green-600 hover:text-green-700"
+                        disabled={loadingActions[`add-${song._id}`]}
+                        className="text-green-600 hover:text-green-700 hover:bg-green-50 ml-2"
                       >
-                        <Plus className="w-4 h-4" />
+                        {loadingActions[`add-${song._id}`] ? (
+                          <LoadingSpinner size="sm" />
+                        ) : (
+                          <Plus className="w-4 h-4" />
+                        )}
                       </Button>
                     </div>
                   ))}

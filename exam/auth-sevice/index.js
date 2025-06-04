@@ -42,6 +42,16 @@ const authenticateToken = (req, res, next) => {
 
 // Routes
 
+// Get all users (for admin/profile management)
+app.get('/users', authenticateToken, async (req, res) => {
+  try {
+    const users = await User.find({}).select('-password -token');
+    res.status(200).json(users);
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+  }
+});
+
 app.get('/user/:email', async (req, res) => {
   try {
     const user = await User.findOne({ email: req.params.email }).select('-password');
@@ -78,9 +88,16 @@ app.post('/user/register', async (req, res) => {
 app.put('/user/:email', async (req, res) => {
   try {
     const { nom, password } = req.body;
+    
+    // Create update object - only include password if it's provided
+    const updateData = { nom };
+    if (password && password.trim() !== '') {
+      updateData.password = password;
+    }
+    
     const user = await User.findOneAndUpdate(
       { email: req.params.email },
-      { nom, password },
+      updateData,
       { new: true }
     ).select('-password');
     

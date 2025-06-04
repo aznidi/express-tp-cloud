@@ -23,6 +23,7 @@ export const Navbar = () => {
     { name: 'Chansons', path: '/chansons' },
     { name: 'Playlists', path: '/playlists' },
     { name: 'Recherche', path: '/search' },
+    { name: 'Profil', path: '/profile' },
   ];
 
   const isActivePath = (path) => {
